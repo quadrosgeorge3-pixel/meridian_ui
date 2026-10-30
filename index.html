@@ -1,0 +1,909 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8"/>
+  <meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+  <title>MERIDIAN — Community-Validated Urban Optimization Digital Twin</title>
+  
+  <!-- Material Symbols & Google Fonts -->
+  <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200" rel="stylesheet"/>
+  <link href="https://fonts.googleapis.com/css2?family=Geist:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet"/>
+  
+  <!-- Tailwind CSS -->
+  <script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+  <script id="tailwind-config">
+    tailwind.config = {
+      darkMode: "class",
+      theme: {
+        extend: {
+          colors: {
+            "tertiary-container": "#00855d",
+            "surface-container-lowest": "#ffffff",
+            "on-secondary": "#ffffff",
+            "background": "#f8fafd",
+            "on-primary": "#ffffff",
+            "secondary": "#0051d5",
+            "surface-container-low": "#f1f4f9",
+            "tertiary": "#007a53",
+            "tertiary-fixed": "#85f8c4",
+            "surface-container-high": "#e2e8f0",
+            "outline": "#64748b",
+            "outline-variant": "#cbd5e1",
+            "error": "#dc2626",
+            "surface": "#f8fafd",
+            "primary-container": "#007bb9",
+            "on-surface": "#0f172a",
+            "on-surface-variant": "#475569",
+            "primary": "#0284c7"
+          },
+          fontFamily: {
+            sans: ["Geist", "sans-serif"],
+            mono: ["JetBrains Mono", "monospace"]
+          }
+        }
+      }
+    }
+  </script>
+  
+  <!-- Three.js + OrbitControls for CAD 3D Engine -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
+  <!-- Chart.js for Scenario Radar Metrics -->
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <!-- Custom CAD Stylesheet -->
+  <link rel="stylesheet" href="css/styles.css"/>
+
+  <style>
+    @layer base {
+      html, body { margin: 0; padding: 0; overflow: hidden; height: 100%; width: 100%; }
+    }
+    ::-webkit-scrollbar { display: none; }
+    .cad-canvas-container canvas {
+      outline: none;
+      display: block;
+    }
+  </style>
+</head>
+
+<body class="bg-surface font-sans text-on-surface antialiased select-none h-screen w-screen overflow-hidden flex">
+
+  <!-- ================= COLLAPSED MINI RAIL NAVIGATION ================= -->
+  <aside class="w-14 bg-surface-container-lowest/85 backdrop-blur-md border-r border-slate-200/80 z-50 flex flex-col items-center justify-between py-4 shrink-0 shadow-xs">
+    <div class="flex flex-col items-center gap-5">
+      <!-- Meridian Spatial Engine Logo -->
+      <a href="login.html" class="w-9 h-9 rounded-lg bg-sky-600 hover:bg-sky-700 flex items-center justify-center text-white shadow-sm ring-1 ring-sky-700/20 transition-transform hover:scale-105" title="MERIDIAN Spatial Twin Platform (Click for Login/Auth)">
+        <span class="material-symbols-outlined text-[20px]">deployed_code</span>
+      </a>
+      
+      <!-- Mini Rail Navigation Tools -->
+      <nav class="flex flex-col gap-2">
+        <button class="w-9 h-9 rounded-md bg-sky-50 text-sky-700 flex items-center justify-center transition-colors" onclick="resetCamera()" title="3D Twin Stage (Kurla District)">
+          <span class="material-symbols-outlined text-[19px]">layers</span>
+        </button>
+        <button class="w-9 h-9 rounded-md text-slate-500 hover:bg-slate-100 hover:text-slate-800 flex items-center justify-center transition-colors" onclick="openGraphModal()" title="Graph Optimization Engine (MST & Weights)">
+          <span class="material-symbols-outlined text-[19px]">polyline</span>
+        </button>
+        <button class="w-9 h-9 rounded-md text-slate-500 hover:bg-slate-100 hover:text-slate-800 flex items-center justify-center transition-colors" onclick="toggleRightPanel()" title="Consensus Feed & Ground Truth">
+          <span class="material-symbols-outlined text-[19px]">how_to_vote</span>
+        </button>
+        <button class="w-9 h-9 rounded-md text-slate-500 hover:bg-slate-100 hover:text-slate-800 flex items-center justify-center transition-colors" onclick="openMetricsModal()" title="Scenario Telemetry Analytics & Radar Chart">
+          <span class="material-symbols-outlined text-[19px]">monitoring</span>
+        </button>
+        <button class="w-9 h-9 rounded-md text-slate-500 hover:bg-slate-100 hover:text-slate-800 flex items-center justify-center transition-colors" id="btn-rail-utility" onclick="toggleUtilities()" title="Underground Utility Clipping Plane (Inferred Pipes)">
+          <span class="material-symbols-outlined text-[19px]">water_drop</span>
+        </button>
+        <button class="w-9 h-9 rounded-md text-slate-500 hover:bg-slate-100 hover:text-slate-800 flex items-center justify-center transition-colors" onclick="openDocsModal()" title="Project Report & Academic Credentials (Group 3)">
+          <span class="material-symbols-outlined text-[19px]">school</span>
+        </button>
+      </nav>
+    </div>
+
+    <!-- Engine Live Status -->
+    <div class="flex flex-col items-center gap-3">
+      <div class="w-2 h-2 rounded-full bg-emerald-500 ring-4 ring-emerald-100 animate-pulse" title="Digital Twin Engine Active"></div>
+      <span class="text-[9px] font-mono font-medium text-slate-400 rotate-180 [writing-mode:vertical-lr]">v2.4 CESIUM/CAD</span>
+    </div>
+  </aside>
+
+  <!-- ================= MAIN VIEWPORT STAGE ================= -->
+  <div class="relative flex-1 h-full w-full overflow-hidden bg-[#eaf0f8]">
+    
+    <!-- ULTRA-CLEAN FLOATING SLIM GLASS HEADER -->
+    <header class="absolute top-3 left-4 right-4 z-40 h-11 bg-white/90 backdrop-blur-md rounded-lg border border-slate-200/90 shadow-[0_2px_12px_rgba(15,23,42,0.06)] flex items-center justify-between px-3">
+      
+      <!-- Brand & Sector Select -->
+      <div class="flex items-center gap-3">
+        <div class="flex items-center gap-1.5">
+          <span class="font-bold text-xs tracking-wider text-slate-900 font-mono">MERIDIAN</span>
+          <span class="text-[9px] font-mono px-1.5 py-0.5 rounded bg-sky-50 text-sky-700 font-semibold border border-sky-100">KURLA PILOT</span>
+        </div>
+        <div class="h-3.5 w-px bg-slate-200"></div>
+        
+        <!-- District Sector Dropdown -->
+        <div class="relative">
+          <button id="sector-select-btn" onclick="toggleDistrictMenu()" class="flex items-center gap-1 px-2 py-1 rounded hover:bg-slate-100 text-xs text-slate-700 font-medium transition-colors">
+            <span class="material-symbols-outlined text-sky-600 text-[15px]">location_on</span>
+            <span id="selected-district-label">Kurla Central District — Sector 07</span>
+            <span class="material-symbols-outlined text-slate-400 text-[14px]">expand_more</span>
+          </button>
+          
+          <!-- Dropdown Menu -->
+          <div id="district-menu" class="hidden absolute top-full left-0 mt-1 w-64 bg-white rounded-lg shadow-xl border border-slate-200 py-1.5 z-50 text-xs font-sans">
+            <div class="px-3 py-1 text-[10px] font-mono text-slate-400 uppercase tracking-wider">Jump to Waypoint:</div>
+            <button class="w-full text-left px-3 py-1.5 hover:bg-sky-50 text-slate-800 flex items-center justify-between" onclick="jumpDistrict('station')">
+              <span>Kurla Station & Bazaar</span>
+              <span class="text-[10px] font-mono text-slate-400">Transit Core</span>
+            </button>
+            <button class="w-full text-left px-3 py-1.5 hover:bg-sky-50 text-slate-800 flex items-center justify-between" onclick="jumpDistrict('lbs')">
+              <span>LBS Marg Arterial</span>
+              <span class="text-[10px] font-mono text-slate-400">Chokepoint</span>
+            </button>
+            <button class="w-full text-left px-3 py-1.5 hover:bg-sky-50 text-slate-800 flex items-center justify-between" onclick="jumpDistrict('nehru')">
+              <span>Nehru Nagar Educational Zone</span>
+              <span class="text-[10px] font-mono text-slate-400">School Zone</span>
+            </button>
+            <button class="w-full text-left px-3 py-1.5 hover:bg-sky-50 text-slate-800 flex items-center justify-between" onclick="jumpDistrict('mithi')">
+              <span>Mithi River Basin (Kranti Nagar)</span>
+              <span class="text-[10px] font-mono text-slate-400">Drainage Levee</span>
+            </button>
+            <button class="w-full text-left px-3 py-1.5 hover:bg-sky-50 text-slate-800 flex items-center justify-between" onclick="jumpDistrict('phoenix')">
+              <span>Phoenix Marketcity Entry</span>
+              <span class="text-[10px] font-mono text-slate-400">Commercial</span>
+            </button>
+            <div class="border-t border-slate-100 my-1"></div>
+            <button class="w-full text-left px-3 py-1.5 hover:bg-slate-50 text-sky-700 font-medium flex items-center gap-1.5" onclick="jumpDistrict('districtOverview')">
+              <span class="material-symbols-outlined text-[14px]">zoom_out_map</span>
+              <span>Full District Extent</span>
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Center Telemetry Pill -->
+      <div class="hidden md:flex items-center gap-2 px-2.5 py-1 rounded-md bg-slate-100/80 font-mono text-[11px] text-slate-600 border border-slate-200/60">
+        <span class="flex items-center gap-1 text-emerald-700 font-medium">
+          <span class="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></span> OSM Overpass Live
+        </span>
+        <span class="text-slate-300">•</span>
+        <span>60 FPS</span>
+        <span class="text-slate-300">•</span>
+        <span>16 Graph Nodes</span>
+        <span class="text-slate-300">•</span>
+        <span class="text-sky-700 font-semibold" id="active-scenario-badge">Hybrid Validated</span>
+      </div>
+
+      <!-- Right Actions: Search + Stakeholder Persona -->
+      <div class="flex items-center gap-2">
+        <div class="relative flex items-center">
+          <input id="search-input" onkeyup="handleSearch(event)" class="w-36 lg:w-48 h-7 pl-6 pr-8 text-[11px] bg-slate-50 hover:bg-white focus:bg-white border border-slate-200 rounded text-slate-700 placeholder:text-slate-400 focus:outline-none focus:ring-1 focus:ring-sky-500 transition-all font-mono" placeholder="Search node or street..." type="text"/>
+          <span class="material-symbols-outlined absolute left-1.5 text-slate-400 text-[14px]">search</span>
+          <span class="absolute right-1 text-[9px] font-mono bg-white px-1 py-0.5 rounded border border-slate-200 text-slate-400">⌘K</span>
+        </div>
+        
+        <div class="h-3.5 w-px bg-slate-200"></div>
+        
+        <!-- Active Persona Avatar Dropdown -->
+        <a href="login.html" class="flex items-center gap-1.5 py-1 px-1.5 rounded-md hover:bg-slate-100 transition-colors" title="Switch Stakeholder Persona">
+          <div id="user-avatar-badge" class="w-6 h-6 rounded-full bg-sky-700 text-white flex items-center justify-center text-[10px] font-mono font-bold">MP</div>
+          <span id="user-name-label" class="text-xs font-medium text-slate-700 hidden lg:inline">Off. Deshmukh (Planner)</span>
+          <span class="material-symbols-outlined text-[13px] text-slate-400">swap_horiz</span>
+        </a>
+      </div>
+    </header>
+
+    <!-- FULL 3D CAD TWIN VIEWPORT CONTAINER -->
+    <div class="relative w-full h-full cursor-crosshair overflow-hidden" id="cesium-viewport">
+      
+      <!-- Three.js 3D Rendering Canvas Mount -->
+      <div id="threejs-canvas-host" class="absolute inset-0 w-full h-full cad-canvas-container"></div>
+
+      <!-- GIS Reticle Badge in Top Center with Rotating Compass & Azimuth -->
+      <div class="absolute top-16 left-1/2 -translate-x-1/2 z-20 flex items-center gap-2 px-3.5 py-1 rounded-full bg-white/90 backdrop-blur-md border border-slate-200 text-[10px] font-mono text-slate-600 shadow-xs">
+        <button onclick="resetNorth()" class="pointer-events-auto flex items-center gap-1.5 hover:text-sky-700 transition-colors" title="Click to Align Screen to True North (0°)">
+          <span class="material-symbols-outlined text-[15px] text-rose-500 transition-transform duration-100 inline-block origin-center" id="compass-needle-icon">explore</span>
+          <span>AZIMUTH <b id="hud-azimuth-val" class="text-slate-900 font-semibold">342°</b> N</span>
+        </button>
+        <span>•</span>
+        <span>TESSELLATION 0.15m</span>
+        <span>•</span>
+        <span class="text-sky-700 font-medium">Click & Drag to Rotate</span>
+      </div>
+
+      <!-- ================= 5 CLEAN, FLOATING 3D SPATIAL PINS OVERLAY ================= -->
+      
+      <!-- PIN 1: Kurla Station Bazaar (Preserved Pedestrian Promenade) -->
+      <div class="absolute left-[38%] top-[48%] -translate-x-1/2 -translate-y-full z-30 group cursor-pointer" onclick="focusPin('CR-101')">
+        <div class="flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-white/95 backdrop-blur-md shadow-md border border-emerald-300 ring-2 ring-emerald-500/10 hover:border-emerald-500 transition-transform group-hover:scale-105">
+          <span class="w-2 h-2 rounded-full bg-emerald-500"></span>
+          <span class="text-[11px] font-mono font-bold text-emerald-800">Bazaar Promenade</span>
+          <span class="text-[10px] font-sans font-medium text-slate-500 border-l border-slate-200 pl-1.5">96% Consensus</span>
+        </div>
+        <div class="w-px h-4 bg-emerald-500 mx-auto"></div>
+        <div class="w-2 h-1 rounded-full bg-emerald-500/30 mx-auto blur-[0.5px]"></div>
+      </div>
+
+      <!-- PIN 2: Kranti Nagar Mithi Culvert (Flood Hazard) -->
+      <div class="absolute left-[24%] top-[39%] -translate-x-1/2 -translate-y-full z-30 group cursor-pointer" onclick="focusPin('CR-102')">
+        <div class="flex items-center gap-1.5 px-2 py-0.5 rounded-full bg-white/95 backdrop-blur-md shadow-md border border-cyan-200 hover:border-cyan-400 transition-transform group-hover:scale-105">
+          <span class="w-2 h-2 rounded-full bg-cyan-500 animate-ping"></span>
+          <span class="text-[11px] font-mono font-bold text-cyan-700">Mithi Culvert • Inferred Drain</span>
+        </div>
+        <div class="w-px h-3.5 bg-cyan-400 mx-auto"></div>
+        <div class="w-1.5 h-1 rounded-full bg-cyan-400/40 mx-auto blur-[0.5px]"></div>
+      </div>
+
+      <!-- PIN 3: Nehru Nagar School Zone (Safety Buffer) -->
+      <div class="absolute left-[68%] top-[42%] -translate-x-1/2 -translate-y-full z-30 group cursor-pointer" onclick="focusPin('CR-103')">
+        <div class="flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-white/95 backdrop-blur-md shadow-md border border-amber-300 ring-2 ring-amber-500/10 hover:border-amber-500 transition-transform group-hover:scale-105">
+          <span class="w-2 h-2 rounded-full bg-amber-500"></span>
+          <span class="text-[11px] font-mono font-bold text-amber-800">School Zone</span>
+          <span class="text-[10px] font-sans font-medium text-slate-500 border-l border-slate-200 pl-1.5">15 km/h Buffer</span>
+        </div>
+        <div class="w-px h-4 bg-amber-500 mx-auto"></div>
+        <div class="w-2 h-1 rounded-full bg-amber-500/30 mx-auto blur-[0.5px]"></div>
+      </div>
+
+      <!-- PIN 4: Kasaiwada Unmapped Settlement -->
+      <div class="absolute left-[33%] top-[60%] -translate-x-1/2 -translate-y-full z-30 group cursor-pointer" onclick="focusPin('CR-104')">
+        <div class="flex items-center gap-1.5 px-2 py-0.5 rounded-full bg-white/95 backdrop-blur-md shadow-md border border-slate-200 hover:border-slate-400 transition-transform group-hover:scale-105">
+          <span class="w-2 h-2 rounded-full bg-slate-600"></span>
+          <span class="text-[11px] font-mono font-semibold text-slate-800">Artisan Parcel 402/B</span>
+        </div>
+        <div class="w-px h-3.5 bg-slate-400 mx-auto"></div>
+        <div class="w-1.5 h-1 rounded-full bg-slate-400/40 mx-auto blur-[0.5px]"></div>
+      </div>
+
+      <!-- PIN 5: Kamani Junction Bottleneck -->
+      <div class="absolute left-[30%] top-[25%] -translate-x-1/2 -translate-y-full z-30 group cursor-pointer" onclick="focusPin('CR-105')">
+        <div class="flex items-center gap-1.5 px-2 py-0.5 rounded-full bg-white/95 backdrop-blur-md shadow-md border border-red-200 hover:border-red-400 transition-transform group-hover:scale-105">
+          <span class="w-2 h-2 rounded-full bg-red-500"></span>
+          <span class="text-[11px] font-mono font-semibold text-red-700">Kamani Turn Conflict</span>
+        </div>
+        <div class="w-px h-3.5 bg-red-400 mx-auto"></div>
+        <div class="w-1.5 h-1 rounded-full bg-red-400/40 mx-auto blur-[0.5px]"></div>
+      </div>
+
+    </div>
+
+    <!-- ================= TACTILE & COMPACT LEFT CONTROL DOCK (WIDTH ~280px) ================= -->
+    <div class="absolute top-16 left-4 z-40 w-[282px] bg-white/92 backdrop-blur-md rounded-xl border border-slate-200/90 shadow-[0_4px_20px_rgba(15,23,42,0.08)] flex flex-col transition-all duration-300" id="left-dock">
+      
+      <!-- Dock Header -->
+      <div class="p-2.5 px-3 flex items-center justify-between border-b border-slate-100">
+        <div class="flex items-center gap-2">
+          <div class="w-6 h-6 rounded bg-slate-900 text-white flex items-center justify-center">
+            <span class="material-symbols-outlined text-[15px]">domain</span>
+          </div>
+          <div>
+            <div class="text-xs font-semibold text-slate-900 leading-tight">Kurla District Control</div>
+            <div class="text-[9px] font-mono text-slate-400 uppercase">CAD Synced Model</div>
+          </div>
+        </div>
+        <button class="w-6 h-6 rounded flex items-center justify-center text-slate-400 hover:text-slate-700 hover:bg-slate-100 transition-colors" onclick="toggleLeftDock()" title="Toggle Control Dock">
+          <span class="material-symbols-outlined text-[16px]" id="left-dock-toggle-icon">expand_less</span>
+        </button>
+      </div>
+
+      <!-- Dock Body -->
+      <div class="p-2.5 flex flex-col gap-2.5" id="left-dock-body">
+        
+        <!-- Crisp 3-Scenario Segment Control -->
+        <div class="p-0.5 rounded-lg bg-slate-100 flex items-center font-mono text-[10px] border border-slate-200/60">
+          <button class="flex-1 py-1 text-center rounded text-slate-500 hover:text-slate-800 transition-all font-medium" id="btn-scen-baseline" onclick="switchScenario('baseline')">
+            Base OSM
+          </button>
+          <button class="flex-1 py-1 text-center rounded text-slate-500 hover:text-slate-800 transition-all font-medium" id="btn-scen-algo" onclick="switchScenario('algorithmic')">
+            Pure MST
+          </button>
+          <button class="flex-1 py-1 text-center rounded bg-white text-sky-700 font-semibold shadow-xs transition-all border border-slate-200/50" id="btn-scen-hybrid" onclick="switchScenario('hybrid')">
+            Hybrid Validated
+          </button>
+        </div>
+
+        <!-- Dense Telemetry Radial Rating Row -->
+        <div class="p-2 rounded-lg bg-slate-50 border border-slate-100 flex items-center gap-2.5">
+          <div class="relative w-12 h-12 shrink-0">
+            <svg class="w-full h-full -rotate-90" viewBox="0 0 36 36">
+              <path class="text-slate-200" d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831" fill="none" stroke="currentColor" stroke-width="3.5"></path>
+              <path class="text-emerald-500 transition-all duration-500" d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831" fill="none" id="radial-progress-bar" stroke="currentColor" stroke-dasharray="94.6, 100" stroke-linecap="round" stroke-width="3.5"></path>
+            </svg>
+            <div class="absolute inset-0 flex items-center justify-center font-mono text-[11px] font-bold text-slate-900" id="metric-confidence-pct">94.6%</div>
+          </div>
+          <div class="flex-1 leading-tight">
+            <div class="text-[11px] font-semibold text-slate-800" id="consensus-title">Community Validation</div>
+            <div class="text-[10px] font-mono text-slate-500" id="consensus-sub">464 Attributable Audits</div>
+            <div class="text-[10px] font-mono text-emerald-600 font-semibold flex items-center gap-0.5 mt-0.5" id="consensus-delta">
+              <span>●</span> +46.6% vs Pure MST
+            </div>
+          </div>
+        </div>
+
+        <!-- Compact 2x2 Telemetry Grid with Micro-Sparklines -->
+        <div class="grid grid-cols-2 gap-1.5 font-mono">
+          
+          <!-- Metric 1: Commute Delay -->
+          <div class="p-2 rounded-lg bg-slate-50 border border-slate-100 flex flex-col justify-between">
+            <div class="flex items-center justify-between text-[10px] text-slate-400">
+              <span>COMMUTE</span>
+              <span class="material-symbols-outlined text-[13px] text-sky-600">timer</span>
+            </div>
+            <div class="text-sm font-bold text-slate-900 mt-1" id="metric-commute-val">-23.8%</div>
+            <!-- Micro Sparkline -->
+            <svg class="w-full h-3 text-sky-500 mt-1" fill="none" viewBox="0 0 50 12">
+              <path d="M0,10 Q15,9 25,5 T50,2" stroke="currentColor" stroke-linecap="round" stroke-width="1.5"></path>
+            </svg>
+            <div class="text-[9px] text-slate-400 mt-0.5" id="metric-commute-raw">29.4m (Base: 38.6m)</div>
+          </div>
+
+          <!-- Metric 2: Efficiency / Resource -->
+          <div class="p-2 rounded-lg bg-slate-50 border border-slate-100 flex flex-col justify-between">
+            <div class="flex items-center justify-between text-[10px] text-slate-400">
+              <span>RESOURCE</span>
+              <span class="material-symbols-outlined text-[13px] text-emerald-600">bolt</span>
+            </div>
+            <div class="text-sm font-bold text-slate-900 mt-1" id="metric-resource-val">-21.5%</div>
+            <svg class="w-full h-3 text-emerald-500 mt-1" fill="none" viewBox="0 0 50 12">
+              <path d="M0,9 Q18,8 30,4 T50,1" stroke="currentColor" stroke-linecap="round" stroke-width="1.5"></path>
+            </svg>
+            <div class="text-[9px] text-slate-400 mt-0.5" id="metric-resource-raw">Water / Utility Loss</div>
+          </div>
+
+          <!-- Metric 3: Safety / Heritage Index -->
+          <div class="p-2 rounded-lg bg-slate-50 border border-slate-100 flex flex-col justify-between">
+            <div class="flex items-center justify-between text-[10px] text-slate-400">
+              <span>SAFETY/HERIT</span>
+              <span class="material-symbols-outlined text-[13px] text-indigo-600">shield</span>
+            </div>
+            <div class="text-sm font-bold text-slate-900 mt-1" id="metric-safety-val">96.2</div>
+            <div class="text-[9px] text-slate-400 truncate" id="metric-safety-raw">Bazaar & Schools Safe</div>
+          </div>
+
+          <!-- Metric 4: Congestion Chokepoint -->
+          <div class="p-2 rounded-lg bg-slate-50 border border-slate-100 flex flex-col justify-between">
+            <div class="flex items-center justify-between text-[10px] text-slate-400">
+              <span>BOTTLENECK</span>
+              <span class="material-symbols-outlined text-[13px] text-amber-600">traffic</span>
+            </div>
+            <div class="text-sm font-bold text-slate-900 mt-1" id="metric-bottleneck-val">49.2</div>
+            <div class="text-[9px] text-slate-400 truncate" id="metric-bottleneck-raw">-33.2 chokepoint drop</div>
+          </div>
+
+        </div>
+
+        <!-- Simulation and Action Buttons -->
+        <div class="flex items-center gap-1.5 pt-0.5">
+          <button class="flex-1 h-8 rounded bg-sky-600 hover:bg-sky-700 text-white text-xs font-medium flex items-center justify-center gap-1.5 shadow-xs active:scale-[0.98] transition-all" id="btn-simulate" onclick="runSimulation()">
+            <span class="material-symbols-outlined text-[15px]">play_arrow</span>
+            <span>Simulate Peak (18:30)</span>
+          </button>
+          
+          <button class="w-8 h-8 rounded bg-slate-100 hover:bg-slate-200 text-slate-600 flex items-center justify-center transition-colors" onclick="openGraphModal()" title="Tune MST Algorithm Parameters">
+            <span class="material-symbols-outlined text-[16px]">tune</span>
+          </button>
+
+          <button class="w-8 h-8 rounded bg-slate-100 hover:bg-slate-200 text-slate-600 flex items-center justify-center transition-colors" onclick="exportGeoJson()" title="Export Kurla GeoJSON">
+            <span class="material-symbols-outlined text-[16px]">download</span>
+          </button>
+        </div>
+
+      </div>
+    </div>
+
+    <!-- ================= MINIMAL RIGHT CONSENSUS PANEL (WIDTH ~290px) ================= -->
+    <div class="absolute top-16 right-4 z-40 w-[292px] bg-white/92 backdrop-blur-md rounded-xl border border-slate-200/90 shadow-[0_4px_20px_rgba(15,23,42,0.08)] flex flex-col transition-all duration-300" id="right-panel">
+      
+      <!-- Panel Header -->
+      <div class="p-2.5 px-3 flex items-center justify-between border-b border-slate-100">
+        <div class="flex items-center gap-2">
+          <span class="w-2 h-2 rounded-full bg-emerald-500"></span>
+          <span class="text-xs font-semibold text-slate-900">Community Corrections</span>
+          <span class="text-[10px] font-mono text-slate-400" id="consensus-count-label">5 Active</span>
+        </div>
+        <button class="w-6 h-6 rounded flex items-center justify-center text-slate-400 hover:text-slate-700 hover:bg-slate-100 transition-colors" onclick="toggleRightPanel()" title="Toggle Panel">
+          <span class="material-symbols-outlined text-[16px]" id="right-panel-toggle-icon">expand_less</span>
+        </button>
+      </div>
+
+      <!-- Panel Body -->
+      <div class="p-2.5 flex flex-col gap-2" id="right-panel-body">
+        
+        <!-- Filter Pills -->
+        <div class="flex items-center gap-1 font-mono text-[10px]">
+          <button id="filter-all" class="px-2 py-0.5 rounded bg-sky-600 text-white font-medium" onclick="filterReports('all')">All (5)</button>
+          <button id="filter-market" class="px-2 py-0.5 rounded bg-slate-100 text-slate-600 hover:bg-slate-200 transition-colors" onclick="filterReports('market')">Market</button>
+          <button id="filter-drainage" class="px-2 py-0.5 rounded bg-slate-100 text-slate-600 hover:bg-slate-200 transition-colors" onclick="filterReports('drainage')">Drainage</button>
+          <button id="filter-safety" class="px-2 py-0.5 rounded bg-slate-100 text-slate-600 hover:bg-slate-200 transition-colors" onclick="filterReports('safety')">Safety</button>
+        </div>
+
+        <!-- 5 Community Ground-Truth Cards -->
+        <div class="flex flex-col gap-1.5 pt-0.5 max-h-[340px] overflow-y-auto" id="reports-card-list">
+          
+          <!-- Card 1: Station Road Bazaar -->
+          <div class="p-2 rounded-lg bg-slate-50 hover:bg-slate-100/80 border border-slate-100 transition-colors cursor-pointer flex flex-col gap-1 report-card" data-category="market" onclick="focusPin('CR-101')">
+            <div class="flex items-center justify-between">
+              <span class="text-[11px] font-semibold text-slate-800 truncate">Station Road Historic Bazaar</span>
+              <span class="text-[9px] font-mono px-1 py-0.5 rounded bg-emerald-100 text-emerald-800 font-medium">Validated</span>
+            </div>
+            <div class="text-[10px] text-slate-500 line-clamp-1">
+              Pure MST proposed 4-lane demolition; saved as pedestrian promenade.
+            </div>
+            <div class="flex items-center justify-between font-mono text-[10px] text-slate-400 pt-0.5">
+              <span>Ramesh G. • Shopkeeper</span>
+              <button class="text-emerald-700 font-semibold hover:underline" onclick="event.stopPropagation(); voteReport('CR-101')">▲ 142 votes</button>
+            </div>
+          </div>
+
+          <!-- Card 2: Mithi River Culvert Inaccuracy -->
+          <div class="p-2 rounded-lg bg-slate-50 hover:bg-slate-100/80 border border-slate-100 transition-colors cursor-pointer flex flex-col gap-1 report-card" data-category="drainage" onclick="focusPin('CR-102')">
+            <div class="flex items-center justify-between">
+              <span class="text-[11px] font-semibold text-slate-800 truncate">Mithi River Culvert Omission</span>
+              <span class="text-[9px] font-mono px-1 py-0.5 rounded bg-cyan-100 text-cyan-800 font-medium">Culvert</span>
+            </div>
+            <div class="text-[10px] text-slate-500 line-clamp-1">
+              OSM omitted monsoon box drain; algorithm would collapse retaining wall.
+            </div>
+            <div class="flex items-center justify-between font-mono text-[10px] text-slate-400 pt-0.5">
+              <span>Sneha P. • Volunteer</span>
+              <button class="text-sky-700 font-semibold hover:underline" onclick="event.stopPropagation(); voteReport('CR-102')">▲ 98 votes</button>
+            </div>
+          </div>
+
+          <!-- Card 3: Nehru Nagar School Zone Safety -->
+          <div class="p-2 rounded-lg bg-slate-50 hover:bg-slate-100/80 border border-slate-100 transition-colors cursor-pointer flex flex-col gap-1 report-card" data-category="safety" onclick="focusPin('CR-103')">
+            <div class="flex items-center justify-between">
+              <span class="text-[11px] font-semibold text-slate-800 truncate">Nehru Nagar School Child Buffer</span>
+              <span class="text-[9px] font-mono px-1 py-0.5 rounded bg-amber-100 text-amber-800 font-medium">School</span>
+            </div>
+            <div class="text-[10px] text-slate-500 line-clamp-1">
+              Protected 2,800 students by rejecting high-speed eastern cut-through.
+            </div>
+            <div class="flex items-center justify-between font-mono text-[10px] text-slate-400 pt-0.5">
+              <span>Farhan S. • PTA Rep</span>
+              <button class="text-amber-700 font-semibold hover:underline" onclick="event.stopPropagation(); voteReport('CR-103')">▲ 177 votes</button>
+            </div>
+          </div>
+
+          <!-- Card 4: Kasaiwada Artisan Settlement -->
+          <div class="p-2 rounded-lg bg-slate-50 hover:bg-slate-100/80 border border-slate-100 transition-colors cursor-pointer flex flex-col gap-1 report-card" data-category="market" onclick="focusPin('CR-104')">
+            <div class="flex items-center justify-between">
+              <span class="text-[11px] font-semibold text-slate-800 truncate">Kasaiwada Artisan Workshops</span>
+              <span class="text-[9px] font-mono px-1 py-0.5 rounded bg-slate-200 text-slate-700 font-medium">Stale GIS</span>
+            </div>
+            <div class="text-[10px] text-slate-500 line-clamp-1">
+              BMC marked parcel as vacant buffer; 80 artisan workshops mapped.
+            </div>
+            <div class="flex items-center justify-between font-mono text-[10px] text-slate-400 pt-0.5">
+              <span>Abdul K. • Artisan</span>
+              <button class="text-slate-600 font-semibold hover:underline" onclick="event.stopPropagation(); voteReport('CR-104')">▲ 83 votes</button>
+            </div>
+          </div>
+
+          <!-- Card 5: Kamani Junction Directionality -->
+          <div class="p-2 rounded-lg bg-slate-50 hover:bg-slate-100/80 border border-slate-100 transition-colors cursor-pointer flex flex-col gap-1 report-card" data-category="safety" onclick="focusPin('CR-105')">
+            <div class="flex items-center justify-between">
+              <span class="text-[11px] font-semibold text-slate-800 truncate">Kamani Junction U-Turn Conflict</span>
+              <span class="text-[9px] font-mono px-1 py-0.5 rounded bg-red-100 text-red-700 font-medium">Review</span>
+            </div>
+            <div class="text-[10px] text-slate-500 line-clamp-1">
+              Banned right turn corrected; queue simulation realigned.
+            </div>
+            <div class="flex items-center justify-between font-mono text-[10px] text-slate-400 pt-0.5">
+              <span>Off. Deshmukh • Traffic</span>
+              <button class="text-red-700 font-semibold hover:underline" onclick="event.stopPropagation(); voteReport('CR-105')">▲ 64 votes</button>
+            </div>
+          </div>
+
+        </div>
+
+        <!-- Bottom Action Buttons -->
+        <div class="grid grid-cols-2 gap-1.5 pt-1">
+          <button class="h-7 rounded bg-sky-50 hover:bg-sky-100 text-sky-700 border border-sky-200/60 font-mono text-[11px] font-medium flex items-center justify-center gap-1 transition-colors" onclick="openContextModal()">
+            <span class="material-symbols-outlined text-[13px]">add_location_alt</span>
+            <span>+ Context</span>
+          </button>
+          
+          <button class="h-7 rounded bg-slate-100 hover:bg-slate-200 text-slate-700 font-mono text-[11px] font-medium flex items-center justify-center gap-1 transition-colors" id="btn-drop-pin" onclick="togglePinDropMode()">
+            <span class="material-symbols-outlined text-[13px]">flag</span>
+            <span id="pin-drop-text">Drop Pin</span>
+          </button>
+        </div>
+
+      </div>
+    </div>
+
+    <!-- ================= ULTRA-CLEAN BOTTOM HUD ================= -->
+    <div class="absolute bottom-3 left-4 right-4 z-40 pointer-events-none flex items-end justify-between">
+      
+      <!-- Bottom-Left: Clean Coordinate Readout -->
+      <div class="pointer-events-auto flex items-center gap-3 px-3 py-1.5 rounded-lg bg-white/90 backdrop-blur-md border border-slate-200/90 shadow-md font-mono text-[11px] text-slate-600">
+        <div class="flex items-center gap-1.5">
+          <span class="w-1.5 h-1.5 rounded-full bg-sky-500 animate-pulse"></span>
+          <span>LAT <b class="text-slate-900 font-semibold" id="hud-lat">19.0657° N</b></span>
+          <span class="text-slate-300">|</span>
+          <span>LON <b class="text-slate-900 font-semibold" id="hud-lng">72.8794° E</b></span>
+        </div>
+        <span class="text-slate-300">|</span>
+        <span>ELEV <b class="text-slate-900 font-semibold">14.2m</b></span>
+        <span class="text-slate-300">|</span>
+        <span class="text-slate-500">EPSG:4326 (WGS84)</span>
+      </div>
+
+      <!-- Bottom-Right: Tactile Micro-Dock for 3D Camera & Screen Rotation -->
+      <div class="pointer-events-auto flex items-center gap-1 p-1 rounded-lg bg-white/95 backdrop-blur-md border border-slate-200/90 shadow-md">
+        <!-- Zoom Controls -->
+        <button class="w-7 h-7 rounded hover:bg-slate-100 text-slate-700 flex items-center justify-center transition-colors" onclick="zoom3D(0.85)" title="Zoom In (+)">
+          <span class="material-symbols-outlined text-[17px]">add</span>
+        </button>
+        <button class="w-7 h-7 rounded hover:bg-slate-100 text-slate-700 flex items-center justify-center transition-colors" onclick="zoom3D(1.15)" title="Zoom Out (-)">
+          <span class="material-symbols-outlined text-[17px]">remove</span>
+        </button>
+        
+        <div class="h-3.5 w-px bg-slate-200 mx-0.5"></div>
+
+        <!-- 3D Screen Rotation Controls -->
+        <button class="w-7 h-7 rounded hover:bg-sky-50 text-sky-700 flex items-center justify-center transition-colors" onclick="rotateScreen(-45)" title="Rotate Screen Left 45° (⟲)">
+          <span class="material-symbols-outlined text-[17px]">rotate_left</span>
+        </button>
+        <button class="w-7 h-7 rounded hover:bg-sky-50 text-sky-700 flex items-center justify-center transition-colors" onclick="rotateScreen(45)" title="Rotate Screen Right 45° (⟳)">
+          <span class="material-symbols-outlined text-[17px]">rotate_right</span>
+        </button>
+        <button class="px-2 h-7 rounded hover:bg-slate-100 text-slate-700 font-mono text-[10px] font-semibold flex items-center gap-1 transition-colors" id="btn-auto-rotate" onclick="toggleAutoRotate()" title="Toggle 360° Continuous Screen Rotation">
+          <span class="material-symbols-outlined text-[16px] text-sky-600" id="icon-auto-rotate">360</span>
+          <span id="label-auto-rotate">Orbit</span>
+        </button>
+
+        <div class="h-3.5 w-px bg-slate-200 mx-0.5"></div>
+
+        <!-- Tilt & Projection Mode -->
+        <button class="px-2 h-7 rounded hover:bg-slate-100 text-sky-700 font-mono text-[11px] font-semibold flex items-center gap-1 transition-colors" id="btn-tilt" onclick="toggleTilt()" title="Tilt Perspective (3D / Planar)">
+          <span class="material-symbols-outlined text-[15px]">view_in_ar</span>
+          <span id="tilt-label">3D</span>
+        </button>
+        <button class="px-2 h-7 rounded hover:bg-slate-100 text-slate-600 font-mono text-[11px] font-medium transition-colors" id="btn-ortho" onclick="toggleProjection()" title="Orthographic / Isometric">
+          <span id="proj-label">CAD</span>
+        </button>
+        
+        <div class="h-3.5 w-px bg-slate-200 mx-0.5"></div>
+
+        <!-- Reset Camera -->
+        <button class="w-7 h-7 rounded hover:bg-slate-100 text-slate-600 flex items-center justify-center transition-colors" onclick="resetCamera()" title="Reset Camera to Kurla Extent">
+          <span class="material-symbols-outlined text-[16px]">filter_center_focus</span>
+        </button>
+      </div>
+
+    </div>
+
+    <!-- ================= MODAL 1: ADD LOCAL SPATIAL CONTEXT ================= -->
+    <div class="hidden absolute inset-0 z-50 bg-slate-900/40 backdrop-blur-xs flex items-center justify-center p-4" id="context-modal">
+      <div class="w-full max-w-sm rounded-xl bg-white p-4 shadow-xl border border-slate-200 flex flex-col gap-3">
+        
+        <div class="flex items-center justify-between pb-1 border-b border-slate-100">
+          <div class="text-xs font-semibold text-slate-900 flex items-center gap-1.5">
+            <span class="material-symbols-outlined text-sky-600 text-[16px]">add_location_alt</span>
+            <span>Add Ground-Truth Spatial Observation</span>
+          </div>
+          <button class="w-6 h-6 rounded flex items-center justify-center text-slate-400 hover:text-slate-700" onclick="closeContextModal()">
+            <span class="material-symbols-outlined text-[16px]">close</span>
+          </button>
+        </div>
+
+        <div class="flex flex-col gap-2">
+          <label class="text-[10px] font-mono text-slate-500 uppercase">Category Tag:</label>
+          <div class="grid grid-cols-3 gap-1 font-mono text-[10px]" id="modal-category-buttons">
+            <button type="button" class="py-1 rounded bg-sky-600 text-white font-medium modal-cat-btn" onclick="selectModalCategory(this, 'Pedestrian Hazard')">Pedestrian</button>
+            <button type="button" class="py-1 rounded bg-slate-100 text-slate-600 modal-cat-btn" onclick="selectModalCategory(this, 'Market / Cultural')">Market</button>
+            <button type="button" class="py-1 rounded bg-slate-100 text-slate-600 modal-cat-btn" onclick="selectModalCategory(this, 'Drainage Culvert')">Drainage</button>
+          </div>
+
+          <label class="text-[10px] font-mono text-slate-500 uppercase mt-1">Observation Title:</label>
+          <input id="new-report-title" class="w-full p-2 text-xs rounded border border-slate-200 focus:outline-none focus:ring-1 focus:ring-sky-500 font-sans" placeholder="e.g. Broken Storm Culvert near Station Subway..." type="text"/>
+
+          <label class="text-[10px] font-mono text-slate-500 uppercase">Lived Ground Reality:</label>
+          <textarea id="new-report-desc" class="w-full p-2 text-xs rounded border border-slate-200 focus:outline-none focus:ring-1 focus:ring-sky-500 font-sans" placeholder="Describe the on-the-ground context that algorithm/GIS datasets miss..." rows="3"></textarea>
+
+          <div class="p-2 rounded bg-slate-50 border border-slate-100 font-mono text-[10px] text-slate-500 flex items-center justify-between">
+            <span>Spatial Coordinates:</span>
+            <span class="font-semibold text-slate-800" id="modal-coord-readout">19.0657° N, 72.8760° E</span>
+          </div>
+        </div>
+
+        <div class="flex items-center justify-end gap-2 pt-1 border-t border-slate-100">
+          <button class="px-2.5 py-1 text-xs text-slate-500 hover:bg-slate-100 rounded" onclick="closeContextModal()">Cancel</button>
+          <button class="px-3 py-1 text-xs bg-sky-600 text-white font-medium rounded hover:bg-sky-700 flex items-center gap-1 shadow-xs" onclick="submitContext()">
+            <span class="material-symbols-outlined text-[14px]">send</span>
+            <span>Inject Observation</span>
+          </button>
+        </div>
+
+      </div>
+    </div>
+
+    <!-- ================= MODAL 2: GRAPH OPTIMIZATION ENGINE & WEIGHTS ================= -->
+    <div class="hidden absolute inset-0 z-50 bg-slate-900/40 backdrop-blur-xs flex items-center justify-center p-4" id="graph-modal">
+      <div class="w-full max-w-xl rounded-2xl bg-white p-5 shadow-2xl border border-slate-200 flex flex-col gap-4">
+        
+        <div class="flex items-center justify-between pb-2 border-b border-slate-100">
+          <div class="flex items-center gap-2">
+            <div class="w-7 h-7 rounded-lg bg-sky-100 text-sky-700 flex items-center justify-center">
+              <span class="material-symbols-outlined text-[18px]">polyline</span>
+            </div>
+            <div>
+              <div class="text-sm font-bold text-slate-900">Graph-Based Optimization Engine</div>
+              <div class="text-[10px] font-mono text-slate-500">Minimum Spanning Tree (MST) & Multi-Objective Weighting</div>
+            </div>
+          </div>
+          <button class="w-7 h-7 rounded flex items-center justify-center text-slate-400 hover:text-slate-700" onclick="closeGraphModal()">
+            <span class="material-symbols-outlined text-[18px]">close</span>
+          </button>
+        </div>
+
+        <!-- Formula Callout -->
+        <div class="p-3 rounded-xl bg-slate-50 border border-slate-200/80 font-mono text-xs text-slate-700">
+          <div class="text-[10px] text-slate-400 uppercase tracking-wider mb-1">Active Edge Weight Formulation:</div>
+          <div class="font-bold text-sky-800">
+            Cost(e) = α · Length + β · Congestion + γ · CommunityPenalty · (1 - Trust)
+          </div>
+        </div>
+
+        <!-- Interactive Sliders -->
+        <div class="flex flex-col gap-3 font-mono text-xs">
+          
+          <div>
+            <div class="flex items-center justify-between mb-1">
+              <span class="text-slate-700 font-medium">α: Algorithmic Geometric Distance Weight</span>
+              <span class="font-bold text-sky-700" id="slider-alpha-val">0.45</span>
+            </div>
+            <input type="range" min="0.1" max="1.0" step="0.05" value="0.45" id="slider-alpha" oninput="updateWeightsUI()" class="w-full"/>
+          </div>
+
+          <div>
+            <div class="flex items-center justify-between mb-1">
+              <span class="text-slate-700 font-medium">β: Vehicular Congestion Impedance</span>
+              <span class="font-bold text-sky-700" id="slider-beta-val">0.35</span>
+            </div>
+            <input type="range" min="0.1" max="1.0" step="0.05" value="0.35" id="slider-beta" oninput="updateWeightsUI()" class="w-full"/>
+          </div>
+
+          <div>
+            <div class="flex items-center justify-between mb-1">
+              <span class="text-slate-700 font-medium">γ: Community Heritage & Safety Penalty</span>
+              <span class="font-bold text-emerald-700" id="slider-gamma-val">0.65</span>
+            </div>
+            <input type="range" min="0.0" max="1.5" step="0.05" value="0.65" id="slider-gamma" oninput="updateWeightsUI()" class="w-full"/>
+          </div>
+
+        </div>
+
+        <!-- Live Graph Output Badges -->
+        <div class="grid grid-cols-3 gap-2 font-mono text-[11px]">
+          <div class="p-2.5 rounded-lg bg-sky-50 border border-sky-100">
+            <div class="text-slate-500 text-[10px]">MST Trunk Edges</div>
+            <div class="font-bold text-sky-900 text-sm" id="mst-edge-count">15 / 16 Edges</div>
+          </div>
+          <div class="p-2.5 rounded-lg bg-emerald-50 border border-emerald-100">
+            <div class="text-slate-500 text-[10px]">Preserved Heritage</div>
+            <div class="font-bold text-emerald-900 text-sm">3 / 3 Anchors</div>
+          </div>
+          <div class="p-2.5 rounded-lg bg-slate-100 border border-slate-200">
+            <div class="text-slate-500 text-[10px]">Total Spanning Cost</div>
+            <div class="font-bold text-slate-900 text-sm" id="mst-total-cost">18.42 units</div>
+          </div>
+        </div>
+
+        <div class="flex items-center justify-end gap-2 pt-2 border-t border-slate-100">
+          <button class="px-3 py-1.5 text-xs text-slate-600 hover:bg-slate-100 rounded font-medium" onclick="resetDefaultWeights()">Reset Defaults</button>
+          <button class="px-4 py-1.5 text-xs bg-sky-600 text-white font-medium rounded-lg hover:bg-sky-700 shadow-xs flex items-center gap-1.5" onclick="recalcGraphEngine()">
+            <span class="material-symbols-outlined text-[16px]">sync</span>
+            <span>Recalculate Spanning Graph</span>
+          </button>
+        </div>
+
+      </div>
+    </div>
+
+    <!-- ================= MODAL 3: DEEP SCENARIO METRICS & RADAR ANALYTICS ================= -->
+    <div class="hidden absolute inset-0 z-50 bg-slate-900/40 backdrop-blur-xs flex items-center justify-center p-4" id="metrics-modal">
+      <div class="w-full max-w-2xl rounded-2xl bg-white p-5 shadow-2xl border border-slate-200 flex flex-col gap-4 max-h-[90vh] overflow-y-auto">
+        
+        <div class="flex items-center justify-between pb-2 border-b border-slate-100">
+          <div class="flex items-center gap-2">
+            <div class="w-7 h-7 rounded-lg bg-emerald-100 text-emerald-700 flex items-center justify-center">
+              <span class="material-symbols-outlined text-[18px]">monitoring</span>
+            </div>
+            <div>
+              <div class="text-sm font-bold text-slate-900">Scenario Performance & Decision Tracking</div>
+              <div class="text-[10px] font-mono text-slate-500">Side-by-side comparative deltas across 3 models in Kurla District</div>
+            </div>
+          </div>
+          <button class="w-7 h-7 rounded flex items-center justify-center text-slate-400 hover:text-slate-700" onclick="closeMetricsModal()">
+            <span class="material-symbols-outlined text-[18px]">close</span>
+          </button>
+        </div>
+
+        <!-- Radar Chart Container -->
+        <div class="h-64 w-full bg-slate-50 rounded-xl border border-slate-200/80 p-2 flex items-center justify-center">
+          <canvas id="scenarioRadarChart"></canvas>
+        </div>
+
+        <!-- Comparative Metrics Table -->
+        <div class="overflow-x-auto">
+          <table class="w-full text-left font-mono text-[11px] border border-slate-200 rounded-lg">
+            <thead class="bg-slate-100 text-slate-600">
+              <tr>
+                <th class="p-2 border-b">Indicator</th>
+                <th class="p-2 border-b text-rose-600">1. Baseline Real-World</th>
+                <th class="p-2 border-b text-sky-600">2. Pure Algorithmic</th>
+                <th class="p-2 border-b text-emerald-700">3. Meridian Hybrid</th>
+              </tr>
+            </thead>
+            <tbody class="divide-y divide-slate-100 text-slate-700">
+              <tr>
+                <td class="p-2 font-sans font-medium text-slate-900">Avg Commute Delay</td>
+                <td class="p-2">38.6 min (0%)</td>
+                <td class="p-2 font-bold text-sky-700">26.2 min (-32.1%)</td>
+                <td class="p-2 font-bold text-emerald-700">29.4 min (-23.8%)</td>
+              </tr>
+              <tr>
+                <td class="p-2 font-sans font-medium text-slate-900">Community Consensus</td>
+                <td class="p-2">48.0% (Unquantified)</td>
+                <td class="p-2 text-rose-600 font-bold">23.5% (High Backlash)</td>
+                <td class="p-2 font-bold text-emerald-700">94.6% (Validated)</td>
+              </tr>
+              <tr>
+                <td class="p-2 font-sans font-medium text-slate-900">Station Bazaar Status</td>
+                <td class="p-2">Choked Corridor</td>
+                <td class="p-2 text-rose-600">Demolished for 4-lane</td>
+                <td class="p-2 font-bold text-emerald-700">Preserved Promenade</td>
+              </tr>
+              <tr>
+                <td class="p-2 font-sans font-medium text-slate-900">Nehru School Safety</td>
+                <td class="p-2">Unregulated traffic</td>
+                <td class="p-2 text-rose-600">Arterial bypass hazard</td>
+                <td class="p-2 font-bold text-emerald-700">15 km/h Safe Zone</td>
+              </tr>
+              <tr>
+                <td class="p-2 font-sans font-medium text-slate-900">Mithi River Culvert</td>
+                <td class="p-2">Floods 4.5 ft annual</td>
+                <td class="p-2 text-rose-600">Pruned from network</td>
+                <td class="p-2 font-bold text-emerald-700">Reinforced floodgate levee</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+
+        <div class="flex items-center justify-end pt-1 border-t border-slate-100">
+          <button class="px-4 py-1.5 text-xs bg-sky-600 text-white font-medium rounded-lg hover:bg-sky-700" onclick="closeMetricsModal()">Close Analytics</button>
+        </div>
+
+      </div>
+    </div>
+
+    <!-- ================= MODAL 4: PROJECT BRIEF & ACADEMIC CREDENTIALS ================= -->
+    <div class="hidden absolute inset-0 z-50 bg-slate-900/40 backdrop-blur-xs flex items-center justify-center p-4" id="docs-modal">
+      <div class="w-full max-w-2xl rounded-2xl bg-white p-6 shadow-2xl border border-slate-200 flex flex-col gap-4 max-h-[90vh] overflow-y-auto">
+        
+        <div class="flex items-center justify-between pb-2 border-b border-slate-100">
+          <div class="flex items-center gap-2.5">
+            <div class="w-8 h-8 rounded-lg bg-sky-600 text-white flex items-center justify-center shadow-xs">
+              <span class="material-symbols-outlined text-[20px]">school</span>
+            </div>
+            <div>
+              <div class="text-sm font-bold text-slate-900">MERIDIAN: Community-Validated Urban Optimization Digital Twin</div>
+              <div class="text-[10px] font-mono text-slate-500">Semester III Community Engagement Project Report • August 20, 2026</div>
+            </div>
+          </div>
+          <button class="w-7 h-7 rounded flex items-center justify-center text-slate-400 hover:text-slate-700" onclick="closeDocsModal()">
+            <span class="material-symbols-outlined text-[18px]">close</span>
+          </button>
+        </div>
+
+        <!-- Authors Grid -->
+        <div class="p-3 rounded-xl bg-slate-50 border border-slate-200">
+          <div class="text-[10px] font-mono uppercase text-slate-400 font-semibold mb-1">Development Team (Group 3):</div>
+          <div class="grid grid-cols-2 sm:grid-cols-4 gap-2 font-mono text-xs">
+            <div class="p-2 bg-white rounded-lg border border-slate-200">
+              <div class="font-bold text-slate-800">George Quadros</div>
+              <div class="text-[10px] text-slate-500">Group 3 Member</div>
+            </div>
+            <div class="p-2 bg-white rounded-lg border border-slate-200">
+              <div class="font-bold text-slate-800">Malhar Sarwate</div>
+              <div class="text-[10px] text-slate-500">Group 3 Member</div>
+            </div>
+            <div class="p-2 bg-white rounded-lg border border-slate-200">
+              <div class="font-bold text-slate-800">Soham Khilari</div>
+              <div class="text-[10px] text-slate-500">Group 3 Member</div>
+            </div>
+            <div class="p-2 bg-white rounded-lg border border-slate-200">
+              <div class="font-bold text-slate-800">Vedant Sakpal</div>
+              <div class="text-[10px] text-slate-500">Group 3 Member</div>
+            </div>
+          </div>
+        </div>
+
+        <!-- 4-Layer Architecture -->
+        <div>
+          <div class="text-xs font-bold text-slate-900 mb-2">System Architecture (4 Tiers):</div>
+          <div class="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs">
+            <div class="p-2.5 rounded-lg border border-slate-200 bg-white">
+              <span class="font-mono text-sky-700 font-bold block text-[11px]">1. Data Layer</span>
+              <p class="text-slate-600 text-[11px] mt-0.5">Ingests OpenStreetMap (OSM) spatial primitives via Overpass API with local boundary clipping for Kurla (L-Ward).</p>
+            </div>
+            <div class="p-2.5 rounded-lg border border-slate-200 bg-white">
+              <span class="font-mono text-sky-700 font-bold block text-[11px]">2. Optimization Engine</span>
+              <p class="text-slate-600 text-[11px] mt-0.5">Custom Python/JS graph engine computing Minimum Spanning Trees (MST) & weighted Dijkstra routing with community penalties.</p>
+            </div>
+            <div class="p-2.5 rounded-lg border border-slate-200 bg-white">
+              <span class="font-mono text-sky-700 font-bold block text-[11px]">3. Rendering Layer</span>
+              <p class="text-slate-600 text-[11px] mt-0.5">CesiumJS / Flat-shaded CAD geometry running smoothly at 60 FPS on consumer laptops without dedicated GPUs.</p>
+            </div>
+            <div class="p-2.5 rounded-lg border border-slate-200 bg-white">
+              <span class="font-mono text-sky-700 font-bold block text-[11px]">4. Community Layer</span>
+              <p class="text-slate-600 text-[11px] mt-0.5">Versioned attributable overlays with anti-brigading trust weighting and clipping planes for inferred underground utilities.</p>
+            </div>
+          </div>
+        </div>
+
+        <!-- Rollout Timeline -->
+        <div>
+          <div class="text-xs font-bold text-slate-900 mb-1.5">Timeline & Phase-Wise Rollout:</div>
+          <div class="flex flex-col gap-1.5 font-mono text-[11px] text-slate-600">
+            <div class="p-2 rounded bg-slate-50 border border-slate-200 flex items-center justify-between">
+              <span><b>Phase 1: Core Twin</b> (2–5 weeks)</span>
+              <span class="text-emerald-700 font-semibold">● Completed (Kurla District)</span>
+            </div>
+            <div class="p-2 rounded bg-slate-50 border border-slate-200 flex items-center justify-between">
+              <span><b>Phase 2: Community Layer</b> (3–4 weeks)</span>
+              <span class="text-emerald-700 font-semibold">● Active (Attributable Contests)</span>
+            </div>
+            <div class="p-2 rounded bg-slate-50 border border-slate-200 flex items-center justify-between">
+              <span><b>Phase 3: Depth & Generalization</b> (3–5 weeks)</span>
+              <span class="text-sky-700 font-semibold">● In Progress (Resource Networks)</span>
+            </div>
+          </div>
+        </div>
+
+        <div class="flex items-center justify-between pt-2 border-t border-slate-100">
+          <a href="login.html" class="text-xs text-sky-600 font-medium hover:underline flex items-center gap-1">
+            <span class="material-symbols-outlined text-[14px]">arrow_back</span>
+            <span>Switch Stakeholder Account</span>
+          </a>
+          <button class="px-4 py-1.5 text-xs bg-sky-600 text-white font-medium rounded-lg hover:bg-sky-700" onclick="closeDocsModal()">Dismiss</button>
+        </div>
+
+      </div>
+    </div>
+
+    <!-- ================= MODAL 5: INSPECT ENTITY DRAWER ================= -->
+    <div class="hidden absolute bottom-14 left-1/2 -translate-x-1/2 z-50 w-full max-w-md bg-white/95 backdrop-blur-md rounded-xl p-3.5 shadow-2xl border border-slate-200 font-sans" id="entity-drawer">
+      <div class="flex items-center justify-between pb-1.5 border-b border-slate-100">
+        <div class="flex items-center gap-1.5">
+          <span class="material-symbols-outlined text-sky-600 text-[18px]" id="entity-icon">domain</span>
+          <span class="text-xs font-bold text-slate-900" id="entity-title">Kurla Railway Station</span>
+        </div>
+        <button class="w-6 h-6 rounded flex items-center justify-center text-slate-400 hover:text-slate-700" onclick="closeEntityDrawer()">
+          <span class="material-symbols-outlined text-[16px]">close</span>
+        </button>
+      </div>
+      <p class="text-xs text-slate-600 mt-1.5" id="entity-desc">Central & Harbour suburban transit nexus serving 350,000 commuters daily.</p>
+      <div class="mt-2 pt-2 border-t border-slate-100 flex items-center justify-between font-mono text-[10px] text-slate-500">
+        <span id="entity-tag">CAD Entity #BLD_STN</span>
+        <button class="text-sky-700 font-semibold hover:underline" onclick="openContextModal()">+ Attach Spatial Feedback</button>
+      </div>
+    </div>
+
+    <!-- ================= FLOATING TOAST NOTIFICATION ================= -->
+    <div class="hidden absolute top-16 left-1/2 -translate-x-1/2 z-50 flex items-center gap-2 px-3 py-1.5 rounded-lg bg-slate-900 text-white text-xs font-mono shadow-xl transition-all" id="toast">
+      <span class="material-symbols-outlined text-emerald-400 text-[16px]" id="toast-icon">check_circle</span>
+      <span id="toast-msg">Ready</span>
+    </div>
+
+  </div>
+
+  <!-- Include App Logic Scripts -->
+  <script src="js/communityData.js"></script>
+  <script src="js/graphEngine.js"></script>
+  <script src="js/scene3d.js"></script>
+  <script src="js/metrics.js"></script>
+  <script src="js/app.js"></script>
+</body>
+</html>
